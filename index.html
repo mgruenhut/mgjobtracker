@@ -258,7 +258,11 @@
             company: parsed.company,
             position: parsed.position,
             status: parsed.status,
-            notes: `[${new Date().toLocaleString()}] ${parsed.notes}`,
+            notes: [{
+              id: Date.now(),
+              text: parsed.notes,
+              timestamp: new Date().toISOString()
+            }],
             createdAt: new Date().toISOString()
           };
           setJobs([newJob, ...jobs]);
@@ -266,11 +270,15 @@
           setJobs(jobs.map(job => {
             if (job.company.toLowerCase().includes(parsed.company.toLowerCase()) ||
                 parsed.company.toLowerCase().includes(job.company.toLowerCase())) {
-              const timestamp = new Date().toLocaleString();
+              const newNote = {
+                id: Date.now(),
+                text: parsed.notes,
+                timestamp: new Date().toISOString()
+              };
               return {
                 ...job,
                 status: parsed.status,
-                notes: `${job.notes}\n[${timestamp}] ${parsed.notes}`,
+                notes: Array.isArray(job.notes) ? [...job.notes, newNote] : [newNote],
                 updatedAt: new Date().toISOString()
               };
             }
@@ -289,29 +297,40 @@
           // Update existing job
           setJobs(jobs.map(job => {
             if (job.id === editingJob.id) {
-              const timestamp = new Date().toLocaleString();
-              const noteUpdate = formData.notes.trim() ? `\n[${timestamp}] ${formData.notes}` : '';
-              return {
+              const updates = {
                 ...job,
                 company: formData.company,
                 position: formData.position,
                 status: formData.status,
-                notes: job.notes + noteUpdate,
                 updatedAt: new Date().toISOString()
               };
+              
+              if (formData.notes.trim()) {
+                const newNote = {
+                  id: Date.now(),
+                  text: formData.notes,
+                  timestamp: new Date().toISOString()
+                };
+                updates.notes = Array.isArray(job.notes) ? [...job.notes, newNote] : [newNote];
+              }
+              
+              return updates;
             }
             return job;
           }));
           setEditingJob(null);
         } else {
           // Add new job
-          const timestamp = new Date().toLocaleString();
           const newJob = {
             id: Date.now(),
             company: formData.company,
             position: formData.position,
             status: formData.status,
-            notes: formData.notes ? `[${timestamp}] ${formData.notes}` : '',
+            notes: formData.notes ? [{
+              id: Date.now(),
+              text: formData.notes,
+              timestamp: new Date().toISOString()
+            }] : [],
             createdAt: new Date().toISOString()
           };
           setJobs([newJob, ...jobs]);
@@ -342,6 +361,20 @@
         setShowForm(false);
         setEditingJob(null);
         setFormData({ company: '', position: '', status: 'applied', notes: '' });
+      };
+
+      const deleteNote = (jobId, noteId) => {
+        setJobs(jobs.map(job => {
+          if (job.id === jobId) {
+            return {
+              ...job,
+              notes: Array.isArray(job.notes) 
+                ? job.notes.filter(note => note.id !== noteId)
+                : []
+            };
+          }
+          return job;
+        }));
       };
 
       const statusColors = {
@@ -496,11 +529,27 @@
                           </span>
                         </div>
                         
-                        {job.notes && (
-                          <div className="bg-white/5 rounded-lg p-3 mt-3">
-                            <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">
-                              {job.notes}
-                            </p>
+                        {job.notes && job.notes.length > 0 && (
+                          <div className="mt-3 space-y-2">
+                            {(Array.isArray(job.notes) ? job.notes : []).map((note) => (
+                              <div key={note.id} className="bg-white/5 rounded-lg p-3 flex justify-between items-start gap-3">
+                                <div className="flex-1">
+                                  <p className="text-xs text-slate-500 mono mb-1">
+                                    {new Date(note.timestamp).toLocaleString()}
+                                  </p>
+                                  <p className="text-sm text-slate-300 leading-relaxed">
+                                    {note.text}
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={() => deleteNote(job.id, note.id)}
+                                  className="text-slate-500 hover:text-red-400 transition-colors flex-shrink-0"
+                                  title="Delete note"
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
